@@ -27,9 +27,25 @@ To use the skip list data structure in your C projects, follow these steps:
 #include <time.h>
 #include "cskiplist.h"
 
-void* Create_int()
+static inline int compare_int(const void* left, const void* right)
 {
- 	return INT_TO_POINTER(0);
+	int x = POINTER_TO_INT(left);
+	int y = POINTER_TO_INT(right);
+
+	if (x < y)
+	{
+		return -1;
+	}
+	else if (x == y)
+	{
+		return 0;
+	}
+	else
+	{
+		return 1;
+	}
+
+	return 1;
 }
 
 int main() {
