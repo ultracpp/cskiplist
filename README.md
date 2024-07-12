@@ -25,6 +25,7 @@ To use the skip list data structure in your C projects, follow these steps:
 ```c
 #include <stdio.h>
 #include <time.h>
+#include "clib.h"
 #include "cskiplist.h"
 
 static inline int compare_int(const void* left, const void* right)
