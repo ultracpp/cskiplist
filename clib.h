@@ -1,5 +1,5 @@
 /*
- * cskiplist - Hash Map Implementation in C Language
+ * cskiplist - Skip List Implementation in C Language
  * Copyright (c) 2024 Eungsuk Jeon
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
