@@ -118,14 +118,11 @@ void c_skip_list_destroy(c_skip_list* plist)
 	{
 		c_skip_node_destroy(plist->head);
 	}
-
-	free(plist);
-	plist = NULL;
 }
 
 void c_skip_list_swap(c_skip_list* dst, c_skip_list* src)
 {
-	c_skip_node* head = dst->head;
+	/*c_skip_node* head = dst->head;
 
 	for (int i = 0, j = C_SKIP_LIST_MAX_LEVEL; i < j; i++)
 	{
@@ -139,66 +136,49 @@ void c_skip_list_swap(c_skip_list* dst, c_skip_list* src)
 	dst->compareTo = src->compareTo;
 
 	src->head = head;
-	src->count = 0;
+	src->count = 0;*/
+
+	c_skip_list tmp = *dst;
+	*dst = *src;
+	*src = tmp;
 }
 
-static inline c_skip_node* insert_level(c_skip_list* plist, c_skip_node* previous, c_skip_node* pnode, int level)
+void c_skip_list_swap_ptr(c_skip_list** dst, c_skip_list** src)
 {
-	c_skip_node* current = previous->next[level];
-
-	if (current == NULL)
-	{
-		previous->next[level] = pnode;
-		pnode->prev[level] = previous;
-		return previous;
-	}
-
-	if (plist->compareTo(pnode->key, current->key) < 1)
-	{
-		previous->next[level] = pnode;
-		pnode->next[level] = current;
-		pnode->prev[level] = previous;
-		current->prev[level] = pnode;
-		return previous;
-	}
-
-	while (current->next[level] != NULL &&
-		plist->compareTo(current->key, pnode->key) < 1 &&
-		plist->compareTo(((c_skip_node*)current->next[level])->key, pnode->key) < 1)
-	{
-		current = current->next[level];
-	}
-
-	c_skip_node* successor = current->next[level];
-	current->next[level] = pnode;
-	pnode->prev[level] = current;
-	pnode->next[level] = successor;
-
-	if (successor != NULL)
-	{
-		successor->prev[level] = pnode;
-	}
-
-	return current;
+	c_skip_list* temp = *dst;
+	*dst = *src;
+	*src = temp;
 }
 
 void c_skip_list_insert(c_skip_list* plist, void* key)
 {
+	c_skip_node* update[C_SKIP_LIST_MAX_LEVEL];
+	c_skip_node* current = plist->head;
 	int level = random_level();
 
-	c_skip_node* pnode = c_skip_node_new(key, level);
-	c_skip_node* previous = NULL;
-
-	for (int i = level - 1; i >= 0; i--)
+	for (int i = C_SKIP_LIST_MAX_LEVEL - 1; i >= 0; i--)
 	{
-		if (previous != NULL)
+		while (current->next[i] != NULL &&
+			plist->compareTo(((c_skip_node*)current->next[i])->key, key) < 0)
 		{
-			previous = insert_level(plist, previous, pnode, i);
+			current = (c_skip_node*)current->next[i];
 		}
-		else
+		update[i] = current;
+	}
+
+	c_skip_node* pnode = c_skip_node_new(key, level);
+
+	for (int i = 0; i < level; i++)
+	{
+		pnode->next[i] = update[i]->next[i];
+		pnode->prev[i] = update[i];
+
+		if (update[i]->next[i] != NULL)
 		{
-			previous = insert_level(plist, plist->head, pnode, i);
+			((c_skip_node*)update[i]->next[i])->prev[i] = pnode;
 		}
+
+		update[i]->next[i] = pnode;
 	}
 
 	plist->count++;
@@ -206,58 +186,22 @@ void c_skip_list_insert(c_skip_list* plist, void* key)
 
 c_skip_node* c_skip_list_find(c_skip_list* plist, void* key)
 {
-	int level = C_SKIP_LIST_MAX_LEVEL - 1;
-	c_skip_node* current = plist->head->next[level];
-	c_skip_node* previous = NULL;
+	c_skip_node* current = plist->head;
 
-	while (level > 0 && current == NULL)
+	for (int i = C_SKIP_LIST_MAX_LEVEL - 1; i >= 0; i--)
 	{
-		current = plist->head->next[--level];
+		while (current->next[i] != NULL &&
+			plist->compareTo(((c_skip_node*)current->next[i])->key, key) < 0)
+		{
+			current = (c_skip_node*)current->next[i];
+		}
 	}
 
-	while (current != NULL)
+	current = (c_skip_node*)current->next[0];
+
+	if (current != NULL && plist->compareTo(current->key, key) == 0)
 	{
-		int result = plist->compareTo(current->key, key);
-		//printf("%d, %d %d\n", level, current->key, key);
-
-		if (result == 0)
-		{
-			return current;
-		}
-		else if (result < 0)
-		{
-			//printf("%d < %d\n", current->key, key);
-			previous = current;
-			current = current->next[level];
-
-			if (current == NULL)
-			{
-				while (level > 0 && current == NULL)
-				{
-					current = previous->next[--level];
-				}
-			}
-		}
-		else
-		{
-			//printf("%d > %d\n", current->key, key);
-			current = NULL;
-
-			if (previous != NULL)
-			{
-				while (level > 0 && current == NULL)
-				{
-					current = previous->next[--level];
-				}
-			}
-			else
-			{
-				while (level > 0 && current == NULL)
-				{
-					current = plist->head->next[--level];
-				}
-			}
-		}
+		return current;
 	}
 
 	return NULL;
@@ -274,17 +218,20 @@ int c_skip_list_remove(c_skip_list* plist, void* key)
 
 	for (int i = pnode->level - 1; i >= 0; i--)
 	{
-		//printf("level:%d\n", i);
-		c_skip_node* prev = pnode->prev[i];
-		c_skip_node* next = pnode->next[i];
+		c_skip_node* prev = (c_skip_node*)pnode->prev[i];
+		c_skip_node* next = (c_skip_node*)pnode->next[i];
 
 		if (next != NULL)
 		{
-			//printf("next:%d\n", next->key);
 			next->prev[i] = prev;
 		}
 
 		prev->next[i] = next;
+	}
+
+	if (plist->value_free)
+	{
+		free(pnode->key);
 	}
 
 	c_skip_node_destroy(pnode);
@@ -300,24 +247,26 @@ void c_skip_list_clear(c_skip_list* plist)
 	{
 		while (current != NULL)
 		{
-			c_skip_node* pnode = current->next[0];
-
+			c_skip_node* pnode = (c_skip_node*)current->next[0];
 			free(current->key);
-
 			c_skip_node_destroy(current);
-
 			current = pnode;
 		}
-	} else
+	}
+	else
 	{
 		while (current != NULL)
 		{
-			c_skip_node* pnode = current->next[0];
-
+			c_skip_node* pnode = (c_skip_node*)current->next[0];
 			c_skip_node_destroy(current);
-
 			current = pnode;
 		}
+	}
+
+	for (int i = 0; i < C_SKIP_LIST_MAX_LEVEL; i++)
+	{
+		plist->head->next[i] = NULL;
+		plist->head->prev[i] = NULL;
 	}
 
 	plist->count = 0;
@@ -327,11 +276,11 @@ void c_skip_list_print(c_skip_list* plist)
 {
 	for (int i = C_SKIP_LIST_MAX_LEVEL - 1; i >= 0; i--)
 	{
-		c_skip_node* current = plist->head->next[i];
+		c_skip_node* current = (c_skip_node*)plist->head->next[i];
 
 		while (current != NULL)
 		{
-			c_skip_node* pnode = current->next[i];
+			c_skip_node* pnode = (c_skip_node*)current->next[i];
 
 			printf("%d ", current->key);
 
