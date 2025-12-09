@@ -44,13 +44,14 @@ extern "C"
 	void c_skip_list_init(c_skip_list* plist, int value_free, int (*compareTo)(const void*, const void*));
 	void c_skip_list_destroy(c_skip_list* plist);
 	void c_skip_list_swap(c_skip_list* dst, c_skip_list* src);
+	void c_skip_list_swap_ptr(c_skip_list** dst, c_skip_list** src);
 
 	void c_skip_list_insert(c_skip_list* plist, void* key);
 	c_skip_node* c_skip_list_find(c_skip_list* plist, void* key);
 	int c_skip_list_remove(c_skip_list* plist, void* key);
 	void c_skip_list_clear(c_skip_list* plist);
 	void c_skip_list_print(c_skip_list* plist);
-	
+
 #ifdef __cplusplus
 }
 #endif
